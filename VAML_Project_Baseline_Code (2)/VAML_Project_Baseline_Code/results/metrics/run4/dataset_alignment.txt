@@ -1,0 +1,8 @@
+Images in folder: 100
+GT entries: 102
+
+Images with NO GT: 0
+
+GT with NO image: 2
+  100
+  imagedataset

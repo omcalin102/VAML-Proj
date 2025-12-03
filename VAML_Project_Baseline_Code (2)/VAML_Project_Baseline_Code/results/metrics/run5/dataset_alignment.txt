@@ -1,0 +1,4 @@
+Images in folder: 100
+GT entries: 102
+
+Images with NO GT: 0
