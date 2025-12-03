@@ -11,6 +11,17 @@ function model = train_svm(X, y, C, varargin)
 
 validateattributes(C, {'numeric'}, {'scalar','positive','finite'});
 
+% fitcsvm requires a unit box constraint when only a single class is
+% present (one-class novelty detection). Detect this scenario up front so
+% we can provide a clearer warning instead of surfacing MATLAB's runtime
+% error.
+if numel(unique(y)) == 1 && C ~= 1
+    warning('train_svm:OneClassBoxConstraint', ...
+        ['Only one class present in training data; overriding box ' ...
+         'constraint to 1 for one-class SVM.']);
+    C = 1;
+end
+
 args = {'KernelFunction','linear','BoxConstraint',C};
 if ~any(strcmpi(varargin, 'Standardize'))
     args = [args, {'Standardize', true}];
