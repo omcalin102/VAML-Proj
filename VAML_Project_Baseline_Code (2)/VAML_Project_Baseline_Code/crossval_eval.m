@@ -22,12 +22,14 @@ paramValues = paramValues(:)';
 nP = numel(paramValues);
 
 varNames = {a.ParamName, 'ModelType', 'Accuracy', 'Precision', 'Recall', 'F1'};
-cvRes = table('Size', [nP numel(varNames)], ...
-    'VariableTypes', {'double','string','double','double','double','double'}, ...
-    'VariableNames', varNames);
+rows = cell(nP, numel(varNames));
 
 for i = 1:nP
-    param = paramValues(i);
+    if iscell(paramValues)
+        param = paramValues{i};
+    else
+        param = paramValues(i);
+    end
     switch splitMode
         case 'holdout'
             cvp = cvpartition(y, 'Holdout', a.Holdout);
@@ -43,8 +45,16 @@ for i = 1:nP
     end
 
     [acc, prec, rec, f1] = metrics_binary(preds, Yva);
-    cvRes{i,:} = {param, string(lower(a.ModelType)), acc, prec, rec, f1};
+    rows{i,1} = param;
+    rows{i,2} = string(lower(a.ModelType));
+    rows{i,3} = acc;
+    rows{i,4} = prec;
+    rows{i,5} = rec;
+    rows{i,6} = f1;
 end
+
+cvRes = cell2table(rows, 'VariableNames', varNames);
+cvRes.ModelType = string(cvRes.ModelType);
 
 % Optional save
 if ~isempty(a.OutDir)

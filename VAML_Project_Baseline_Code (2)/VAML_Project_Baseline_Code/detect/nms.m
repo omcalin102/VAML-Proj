@@ -8,40 +8,41 @@ if isempty(boxes)
     return;
 end
 
-% sort by score
-[sortedS, order] = sort(scores(:), 'descend');
-B = boxes(order, :);
+% sort by score (desc) and iterate with removal to avoid infinite loop when no boxes
+[~, order] = sort(scores(:), 'descend');
+order = order(:);  % ensure column
 
-x1 = B(:,1); y1 = B(:,2);
-x2 = B(:,1)+B(:,3)-1; y2 = B(:,2)+B(:,4)-1;
-areas = (x2 - x1 + 1) .* (y2 - y1 + 1);
+keepIdx = zeros(numel(order), 1);  % preallocate max
+nKeep = 0;
+while ~isempty(order)
+    i = order(1);                    % take best remaining
+    nKeep = nKeep + 1;
+    keepIdx(nKeep) = i;
 
-keep = false(size(B,1),1);
-while ~isempty(B)
-    keep(1) = true;
-    if size(B,1) == 1, break; end
+    if numel(order) == 1
+        break;
+    end
 
-    xx1 = max(B(1,1), B(2:end,1));
-    yy1 = max(B(1,2), B(2:end,2));
-    xx2 = min(B(1,1)+B(1,3)-1, B(2:end,1)+B(2:end,3)-1);
-    yy2 = min(B(1,2)+B(1,4)-1, B(2:end,2)+B(2:end,4)-1);
+    % IoU w.r.t. remaining boxes
+    rem = order(2:end);
+    xx1 = max(boxes(i,1), boxes(rem,1));
+    yy1 = max(boxes(i,2), boxes(rem,2));
+    xx2 = min(boxes(i,1)+boxes(i,3)-1, boxes(rem,1)+boxes(rem,3)-1);
+    yy2 = min(boxes(i,2)+boxes(i,4)-1, boxes(rem,2)+boxes(rem,4)-1);
 
     w = max(0, xx2 - xx1 + 1);
     h = max(0, yy2 - yy1 + 1);
     inter = w .* h;
 
-    area1 = areas(1);
-    area2 = areas(2:end);
+    area1 = boxes(i,3) * boxes(i,4);
+    area2 = boxes(rem,3) .* boxes(rem,4);
     iou = inter ./ (area1 + area2 - inter);
 
-    keepIdxLocal = find([true; iou <= iouThr]);     % IoU threshold (changeable)
-    B     = B(keepIdxLocal, :);
-    areas = areas(keepIdxLocal);
-    sortedS = sortedS(keepIdxLocal);
-    keep = keep(keepIdxLocal);
+    % keep boxes whose IoU is below threshold
+    order = order([true; iou <= iouThr]);            % always drop the current best
 end
 
-keepIdx = order(keep);
-keepB   = boxes(keepIdx, :);
-keepS   = scores(keepIdx);
+keepIdx = keepIdx(1:nKeep);                          % already in descending-score order
+keepB = boxes(keepIdx, :);
+keepS = scores(keepIdx);
 end
