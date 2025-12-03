@@ -45,7 +45,12 @@ switch lower(a.FeatureType)
     case 'hog_pca'
         base = extract_hog(img, 'ResizeTo',a.ResizeTo, 'CellSize',a.CellSize, ...
             'BlockSize',a.BlockSize, 'BlockOverlap',a.BlockOverlap, 'NumBins',a.NumBins);
-        feat = apply_pca(base, a.PCA, a.PCADim);
+        if isempty(a.PCA)
+            warning('PCA struct missing; returning raw HOG features.');
+            feat = base;
+        else
+            feat = apply_pca_features(base, a.PCA, a.PCADim);
+        end
     case 'raw'
         feat = imgResized(:)';
     case 'edges'
@@ -56,19 +61,4 @@ switch lower(a.FeatureType)
 end
 
 feat = single(feat);
-end
-
-function feat = apply_pca(baseFeat, pcaStruct, k)
-if isempty(pcaStruct) || ~isfield(pcaStruct, 'Coeff') || ~isfield(pcaStruct, 'Mu')
-    warning('PCA struct missing; returning raw HOG features.');
-    feat = baseFeat;
-    return;
-end
-coeff = pcaStruct.Coeff;
-mu = pcaStruct.Mu;
-if isempty(k)
-    k = size(coeff,2);
-end
-k = min(k, size(coeff,2));
-feat = bsxfun(@minus, baseFeat, mu) * coeff(:,1:k);
 end
