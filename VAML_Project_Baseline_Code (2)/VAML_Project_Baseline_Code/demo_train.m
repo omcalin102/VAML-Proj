@@ -1,5 +1,5 @@
 function demo_train()
-% Train HOG+SVM and save model + CV table (no detection run).
+% Train multiple descriptor/classifier combinations and save the best model.
 
 clc; close all; rng(42,'twister');                       % RNG seed (changeable)
 
@@ -10,36 +10,83 @@ outModelDir = fullfile('results','models');              % model out (changeable
 outTableDir = fullfile('results','tables');              % tables out (changeable)
 ensure_dir(outModelDir, outTableDir);
 
-% ---- HOG / DATASET ----
-ResizeTo     = [64 128];                                 % resize for HOG (changeable)
+% ---- FEATURE OPTIONS ----
+ResizeTo     = [64 128];                                 % resize for descriptors (changeable)
 CellSize     = [8 8];                                    % HOG cell (changeable)
 BlockSize    = [2 2];                                    % HOG block in cells (changeable)
 BlockOverlap = [1 1];                                    % HOG block overlap (changeable)
 NumBins      = 9;                                        % HOG bins (changeable)
 
-fprintf('[1/3] Building dataset ...\n');
-[X,y] = build_dataset(posDir, negDir, ...
-    'ResizeTo',ResizeTo, 'CellSize',CellSize, ...
-    'BlockSize',BlockSize, 'BlockOverlap',BlockOverlap, 'NumBins',NumBins);
+featureConfigs = [ ...
+    struct('Name','HOG',        'Args', {{'FeatureType','hog','ResizeTo',ResizeTo,'CellSize',CellSize,'BlockSize',BlockSize,'BlockOverlap',BlockOverlap,'NumBins',NumBins}}), ...
+    struct('Name','HOG+PCA128', 'Args', {{'FeatureType','hog','ResizeTo',ResizeTo,'CellSize',CellSize,'BlockSize',BlockSize,'BlockOverlap',BlockOverlap,'NumBins',NumBins,'PCAComponents',128}}), ...
+    struct('Name','Pixels+PCA', 'Args', {{'FeatureType','pixels','ResizeTo',ResizeTo,'PCAComponents',0.90}}) ...
+    ];
 
-% ---- CV ----
-C_values  = [0.1 0.3 1 3 10];                            % SVM C grid (changeable)
+% ---- MODEL OPTIONS ----
+modelConfigs = [ ...
+    struct('ModelType','svm', 'ParamName','C',            'Grid',[0.1 0.3 1 3 10]), ...
+    struct('ModelType','knn', 'ParamName','NumNeighbors', 'Grid',[3 5 7]) ...
+    ];
+
 splitMode = 'holdout';                                   % 'holdout' or 'kfold' (changeable)
 kfoldK    = 5;                                           % K for k-fold (changeable)
 
-fprintf('[2/3] Cross-validating ...\n');
-if strcmpi(splitMode,'kfold')
-    cvRes = crossval_eval(X,y,C_values,'Split','kfold','K',kfoldK,'OutDir',outTableDir,'PrimaryMetric','F1');
-else
-    cvRes = crossval_eval(X,y,C_values,'Split','holdout','Holdout',0.2,'OutDir',outTableDir,'PrimaryMetric','F1'); % holdout size (changeable)
-end
-[~,ix]=max(cvRes(:,5)); bestC=cvRes(ix,1);
+summaryRows = {};
+best = struct('F1', -inf);
 
-% ---- TRAIN + SAVE ----
-fprintf('[3/3] Training best model (C=%.3f) ...\n', bestC);
-model = train_svm(X,y,bestC,'Standardize',true,'ClassNames',[0 1]); % standardize/classes (changeable)
-save(fullfile(outModelDir,'model_baseline.mat'),'model');           % model filename (changeable)
-fprintf('Saved model to results/models/model_baseline.mat\nDONE.\n');
+for f = 1:numel(featureConfigs)
+    fCfg = featureConfigs(f);
+    fprintf('\n[1/3] Building dataset (%s) ...\n', fCfg.Name);
+    [X,y,descCfg] = build_dataset(posDir, negDir, fCfg.Args{:});
+
+    for m = 1:numel(modelConfigs)
+        mCfg = modelConfigs(m);
+        fprintf('[2/3] Cross-validating (%s + %s) ...\n', fCfg.Name, upper(mCfg.ModelType));
+        if strcmpi(splitMode,'kfold')
+            cvRes = crossval_eval(X,y,mCfg.Grid,'Split','kfold','K',kfoldK, ...
+                'OutDir',outTableDir,'Label',sprintf('%s_%s',lower(fCfg.Name),mCfg.ModelType), ...
+                'PrimaryMetric','F1','ModelType',mCfg.ModelType,'ParamName',mCfg.ParamName);
+        else
+            cvRes = crossval_eval(X,y,mCfg.Grid,'Split','holdout','Holdout',0.2, ...
+                'OutDir',outTableDir,'Label',sprintf('%s_%s',lower(fCfg.Name),mCfg.ModelType), ...
+                'PrimaryMetric','F1','ModelType',mCfg.ModelType,'ParamName',mCfg.ParamName);
+        end
+
+        top = cvRes(1,:);
+        summaryRows(end+1,:) = {fCfg.Name, mCfg.ModelType, top.(mCfg.ParamName), top.Accuracy, top.Precision, top.Recall, top.F1}; %#ok<AGROW>
+
+        if top.F1 > best.F1
+            best = struct('FeatureName', fCfg.Name, ...
+                          'Descriptor', descCfg, ...
+                          'ModelType', mCfg.ModelType, ...
+                          'ParamName', mCfg.ParamName, ...
+                          'ParamValue', top.(mCfg.ParamName), ...
+                          'F1', top.F1, ...
+                          'Accuracy', top.Accuracy, ...
+                          'Precision', top.Precision, ...
+                          'Recall', top.Recall, ...
+                          'X', X, 'y', y);
+        end
+    end
+end
+
+% ---- SUMMARY TABLE ----
+summaryNames = {'Feature','Model','ParamValue','Accuracy','Precision','Recall','F1'};
+summaryTable = cell2table(summaryRows, 'VariableNames', summaryNames);
+summaryPath = fullfile(outTableDir, 'cv_summary_grid.csv');
+writetable(summaryTable, summaryPath);
+
+% ---- TRAIN + SAVE BEST ----
+fprintf('\n[3/3] Training best model: %s + %s=%.3g (F1=%.3f) ...\n', best.FeatureName, best.ParamName, best.ParamValue, best.F1);
+classifier = train_model(best.X, best.y, best.ModelType, best.ParamValue, 'Standardize', true, 'ClassNames', unique(best.y));
+model = struct('Classifier', classifier, 'Descriptor', best.Descriptor, ...
+    'ModelType', best.ModelType, 'ParamName', best.ParamName, 'ParamValue', best.ParamValue, ...
+    'FeatureName', best.FeatureName, 'CV', rmfield(best, {'X','y','Descriptor'}));
+
+modelPath = fullfile(outModelDir,'model_best_combo.mat');
+save(modelPath,'model');
+fprintf('Saved model to %s\nDONE.\n', modelPath);
 
 % ---- helper ----
 function ensure_dir(varargin)

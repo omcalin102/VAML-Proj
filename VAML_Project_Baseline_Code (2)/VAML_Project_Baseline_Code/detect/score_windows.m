@@ -1,49 +1,86 @@
 function [boxes, scores] = score_windows(I, model, varargin)
-% Slide a window and score with a trained SVM (fast, capped).
+% Slide a window across a multi-scale pyramid and score with a trained model.
 
 p = inputParser;
 addParameter(p,'BaseWindow',[64 128]);   % [w h] of detector window
 addParameter(p,'Step',16);               % stride in pixels
+addParameter(p,'ScaleFactor',0.90);      % pyramid factor (0.85–0.95 typical)
 addParameter(p,'MinScore',-Inf);         % keep boxes with score >= MinScore
-addParameter(p,'MaxWindows',200);        % hard cap for speed
+addParameter(p,'MaxWindows',400);        % hard cap for speed
 addParameter(p,'Verbose',true);          % print progress
+addParameter(p,'Descriptor',[]);         % optional override descCfg
 parse(p,varargin{:}); a = p.Results;
 
-% grayscale uint8 (HOG expects single-channel)
+% Determine descriptor (fall back to HOG defaults)
+if isstruct(model) && isfield(model,'Descriptor') && ~isempty(model.Descriptor)
+    descCfg = model.Descriptor;
+elseif ~isempty(a.Descriptor)
+    descCfg = a.Descriptor;
+else
+    descCfg = struct('Type','hog','ResizeTo',a.BaseWindow,'CellSize',[8 8], ...
+        'BlockSize',[2 2],'BlockOverlap',[1 1],'NumBins',9,'PCA',[]);
+end
+if ~isfield(descCfg,'ResizeTo') || isempty(descCfg.ResizeTo)
+    descCfg.ResizeTo = a.BaseWindow;
+end
+
+% grayscale uint8
 if size(I,3)>1, I = rgb2gray(I); end
 if ~isa(I,'uint8'), I = im2uint8(I); end
 
-% 1) windows
-wins = sliding_window(I, a.BaseWindow, a.Step);
-nW = size(wins,1);
-if nW==0, boxes=zeros(0,4,'uint32'); scores=zeros(0,1); return; end
-if nW > a.MaxWindows
-    idx = round(linspace(1, nW, a.MaxWindows))';
-    wins = wins(idx,:); nW = size(wins,1);
-end
-if a.Verbose, fprintf('  - windows: %d (capped)\n', nW); drawnow; end
+% Build pyramid scales
+scales = pyramid_scales(size(I), descCfg.ResizeTo, a.ScaleFactor, 'MinShortSide', min(descCfg.ResizeTo));
 
-% 2) HOG features
-tH = tic;
-f1 = extract_hog(imcrop_safe(I,wins(1,:)),'ResizeTo',a.BaseWindow);
-D  = numel(f1); feats = zeros(nW, D, 'single'); feats(1,:) = f1;
-for k = 2:nW
-    feats(k,:) = extract_hog(imcrop_safe(I,wins(k,:)),'ResizeTo',a.BaseWindow);
-    if a.Verbose && mod(k,50)==0
-        fprintf('  - HOG %4d/%4d (%.2fs)\n', k, nW, toc(tH)); drawnow;
+% Preallocate containers
+boxes = zeros(a.MaxWindows, 4, 'single');
+scores = zeros(a.MaxWindows, 1, 'single');
+featDim = [];
+nKept = 0;
+
+tFeat = tic;
+for sIdx = 1:numel(scales)
+    if nKept >= a.MaxWindows, break; end
+    scale = scales(sIdx);
+    I_s = imresize(I, scale);
+    wins = sliding_window(I_s, descCfg.ResizeTo, a.Step);
+    if isempty(wins), continue; end
+
+    remaining = a.MaxWindows - nKept;
+    if size(wins,1) > remaining
+        wins = wins(round(linspace(1, size(wins,1), remaining)),:);
+    end
+
+    for k = 1:size(wins,1)
+        if nKept >= a.MaxWindows, break; end
+        nKept = nKept + 1;
+        patch = imcrop_safe(I_s, wins(k,:));
+        f = extract_descriptor(patch, descCfg);
+        if isempty(featDim)
+            featDim = numel(f);
+            feats = zeros(a.MaxWindows, featDim, 'single');
+        end
+        feats(nKept,:) = f;
+        boxes(nKept,:) = single([wins(k,1:2) ./ scale, wins(k,3:4) ./ scale]);
     end
 end
-if a.Verbose, fprintf('  - HOG total: %.2fs\n', toc(tH)); drawnow; end
+
+if isempty(featDim)
+    boxes = zeros(0,4,'single'); scores = zeros(0,1,'single'); return; end
+
+feats = feats(1:nKept,:); boxes = boxes(1:nKept,:);
+if a.Verbose
+    fprintf('  - pyramid levels: %d | windows used: %d | feat %.2fs\n', numel(scales), nKept, toc(tFeat)); drawnow;
+end
 
 % 3) Predict → use positive-class margin
 tP = tic;
-[~, sc] = predict(model, feats);
+[~, sc] = predict(get_classifier(model), feats);
 if size(sc,2) >= 2
-    cls = string(model.ClassNames);
+    cls = string(get_classifier(model).ClassNames);
     posIx = find(cls=="1" | lower(cls)=="pos" | cls=="true", 1);  % ← positive class
-    if isempty(posIx), posIx = size(sc,2); end                    % fallback
+    if isempty(posIx), posIx = size(sc,2); end                      % fallback
     negIx = setdiff(1:size(sc,2), posIx);
-    sc = sc(:,posIx) - max(sc(:,negIx),[],2);                      % margin = pos - best other
+    sc = sc(:,posIx) - max(sc(:,negIx),[],2);                        % margin = pos - best other
 else
     sc = sc(:,1);
 end
@@ -51,7 +88,7 @@ if a.Verbose, fprintf('  - predict: %d×%d -> %.2fs\n', size(feats,1), size(feat
 
 % 4) Prefilter
 keep  = sc >= a.MinScore;                 % ← raise to be stricter
-boxes = wins(keep,:);
+boxes = boxes(keep,:);
 scores= sc(keep);
 if a.Verbose, fprintf('  - prefilter kept: %d\n', numel(scores)); drawnow; end
 end
@@ -68,4 +105,12 @@ function P = imcrop_safe(I, box)
 x = max(1, box(1)); y = max(1, box(2)); w = max(1, box(3)); h = max(1, box(4));
 x2 = min(size(I,2), x+w-1); y2 = min(size(I,1), y+h-1);
 P = I(y:y2, x:x2);
+end
+
+function clf = get_classifier(model)
+if isstruct(model) && isfield(model,'Classifier')
+    clf = model.Classifier;
+else
+    clf = model;
+end
 end
