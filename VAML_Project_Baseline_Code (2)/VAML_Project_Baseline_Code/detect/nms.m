@@ -38,8 +38,8 @@ while ~isempty(order)
     area2 = boxes(rem,3) .* boxes(rem,4);
     iou = inter ./ (area1 + area2 - inter);
 
-    % keep boxes whose IoU is below threshold
-    order = order([true; iou <= iouThr]);            % always drop the current best
+    % keep boxes whose IoU is below threshold (always drop the current best)
+    order = order([false; iou <= iouThr]);
 end
 
 keepIdx = keepIdx(1:nKeep);                          % already in descending-score order
