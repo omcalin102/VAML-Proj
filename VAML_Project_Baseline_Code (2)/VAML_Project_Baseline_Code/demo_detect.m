@@ -4,7 +4,7 @@ function demo_detect()
 clc; close all; rng(42,'twister');                           % RNG seed (changeable)
 
 % ---- PATHS ----
-modelPath   = fullfile('results','models','model_baseline.mat'); % model path (changeable)
+modelPath   = fullfile('results','models','model_best_combo.mat'); % model path (changeable)
 frameDir    = fullfile('pedestrian','pedestrian');                % test frames dir (changeable)
 gtFile      = fullfile('data','test.dataset');                    % GT file (optional) (changeable)
 outVideoDir = fullfile('results','videos');                       % video out (changeable)
@@ -13,7 +13,7 @@ outFigureDir= fullfile('report','figs');                          % figs out (ch
 ensure_dir(outVideoDir, outTableDir, outFigureDir);
 
 % ---- DETECTOR HYPER-PARAMETERS ----
-BaseWindow  = [64 128];        % window size [w h] (changeable)
+BaseWindow  = [64 128];        % window size [w h] (changeable, overridden by model descriptor)
 Step        = 8;               % stride px (4/8/12) (changeable)
 ScaleFactor = 0.90;            % pyramid factor (0.85–0.95) (changeable)
 NMS_IoU     = 0.30;            % NMS IoU (0.3–0.5) (changeable)
@@ -25,6 +25,9 @@ FPS         = 6;               % output video fps (changeable)
 % ---- LOAD MODEL ----
 assert(exist(modelPath,'file')==2, 'Model not found: %s', modelPath);
 S = load(modelPath); model = S.model;
+if isstruct(model) && isfield(model,'Descriptor')
+    BaseWindow = model.Descriptor.ResizeTo;
+end
 
 % ---- COLLECT FRAMES ----
 frames = dir(fullfile(frameDir,'*.jpg'));
