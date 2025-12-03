@@ -122,9 +122,21 @@ files = files(:);
 end
 
 function lbl = label_from_path(fpath, posDir)
-if startsWith(string(fpath), string(posDir))
-    lbl = 1;
-else
-    lbl = 0;
+% Label is 1 when the file path lies under the positives directory.
+% Use an absolute version of the directory to avoid mismatches between
+% relative (e.g., "data/images/pos/...") and absolute paths returned by
+% dir/fullfile on different MATLAB versions.
+
+fpath = string(fpath);
+posDir = string(posDir);
+
+% Expand relative path to absolute for reliable prefix checking
+if ~startsWith(posDir, filesep) && ~contains(posDir, ':\')
+    posDir = fullfile(pwd, posDir);
 end
+if ~startsWith(fpath, filesep) && ~contains(fpath, ':\')
+    fpath = fullfile(pwd, fpath);
+end
+
+lbl = double(startsWith(fpath, posDir));
 end
