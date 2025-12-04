@@ -109,25 +109,3 @@ if ~isempty(boxes) && a.BoxShrink~=1
     boxes(:,2) = max(1, min(boxes(:,2), imgH - boxes(:,4) + 1));
 end
 end
-
-% ------- helpers -------
-function wins = sliding_window(I, wh, step)
-W = size(I,2); H = size(I,1); w = wh(1); h = wh(2);
-xs = 1:step:max(1, W-w+1); ys = 1:step:max(1, H-h+1);
-[XX,YY] = meshgrid(xs,ys);
-wins = [XX(:) YY(:) repmat([w h], numel(XX), 1)];
-end
-
-function P = imcrop_safe(I, box)
-x = max(1, box(1)); y = max(1, box(2)); w = max(1, box(3)); h = max(1, box(4));
-x2 = min(size(I,2), x+w-1); y2 = min(size(I,1), y+h-1);
-P = I(y:y2, x:x2);
-end
-
-function clf = get_classifier(model)
-if isstruct(model) && isfield(model,'Classifier')
-    clf = model.Classifier;
-else
-    clf = model;
-end
-end
