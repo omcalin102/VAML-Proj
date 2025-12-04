@@ -106,6 +106,10 @@ Best = cell2table(bestRows, 'VariableNames',{'Feature','Classifier','Param','Acc
 
 csvAll  = fullfile(outTableDir, 'feature_classifier_grid.csv');
 csvBest = fullfile(outTableDir, 'feature_classifier_grid_best.csv');
+% Guard against runs where the results/tables directory was removed after
+% initialization (e.g., when calling this function from another working
+% directory).
+ensure_dir(outTableDir);
 writetable(T, csvAll);
 writetable(Best, csvBest);
 fprintf('Saved tables: %s and %s\n', csvAll, csvBest);
@@ -128,6 +132,10 @@ end
 function ensure_dir(varargin)
 for i = 1:nargin
     d = varargin{i};
-    if ~exist(d,'dir'), mkdir(d); end
+    if exist(d,'dir'), continue; end
+    [status,msg] = mkdir(d); % mkdir creates intermediate folders when needed
+    if ~status
+        error('Failed to create directory %s: %s', d, msg);
+    end
 end
 end
