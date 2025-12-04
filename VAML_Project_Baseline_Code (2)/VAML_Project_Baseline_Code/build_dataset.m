@@ -62,19 +62,22 @@ X(1,:) = firstFeat;
 y(1) = label_from_path(allFiles{1}, posDir);
 
 % Process remaining files
+timerStart = tic;
 for k = 2:N
-    if a.Verbose && mod(k, 200) == 0
-        fprintf('  - features %4d/%4d\n', k, N); drawnow;
-    end
     X(k,:) = extract_features(imread(allFiles{k}), ...
         'FeatureType',a.FeatureType, 'ResizeTo',a.ResizeTo, 'CellSize',a.CellSize, ...
         'BlockSize',a.BlockSize, 'BlockOverlap',a.BlockOverlap, 'NumBins',a.NumBins, ...
         'EdgeMethod',a.EdgeMethod, 'PCA',a.PCA, 'PCADim',a.PCADim);
     y(k) = label_from_path(allFiles{k}, posDir);
+
+    if a.Verbose && (mod(k, 100) == 0 || k == N)
+        progress_bar(k, N, timerStart, '  - extracting features');
+    end
 end
 
 if a.Verbose
-    fprintf('  - done. X: %d x %d | pos=%d / neg=%d\n', size(X,1), size(X,2), sum(y==1), sum(y==0));
+    fprintf('  - done. X: %d x %d | pos=%d / neg=%d | total %.1fs\n', ...
+        size(X,1), size(X,2), sum(y==1), sum(y==0), toc(timerStart));
 end
 end
 

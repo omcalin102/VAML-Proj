@@ -3,7 +3,7 @@ function cvRes = crossval_eval(X, y, paramValues, varargin)
 %   cvRes is N x 5 matrix: [param, Accuracy, Precision, Recall, F1].
 
 p = inputParser;
-addParameter(p, 'Split', 'holdout');           % 'holdout' or 'kfold'
+addParameter(p, 'Split', 'holdout');           % 'holdout', 'kfold', or 'leaveout'
 addParameter(p, 'Holdout', 0.2);               % fraction for holdout
 addParameter(p, 'K', 5);                       % folds for kfold
 addParameter(p, 'OutDir', '');                 % optional CSV output dir
@@ -11,15 +11,18 @@ addParameter(p, 'PrimaryMetric', 'F1');        % for display/ordering only
 addParameter(p, 'TrainFcn', @(Xtr,Ytr,p) train_svm(Xtr, Ytr, p, 'Standardize', true));
 addParameter(p, 'PredictFcn', @predict);
 addParameter(p, 'ParamName', 'Param');
+addParameter(p, 'ShowProgress', true);
 parse(p, varargin{:});
 a = p.Results;
 
 splitMode = lower(a.Split);
-assert(any(strcmp(splitMode, {'holdout','kfold'})), 'Split must be holdout or kfold');
+assert(any(strcmp(splitMode, {'holdout','kfold','leaveout'})), 'Split must be holdout, kfold, or leaveout');
 
 paramValues = paramValues(:)';
 nParams = numel(paramValues);
 cvRes = zeros(nParams, 5);
+
+timerStart = tic;
 
 for i = 1:nParams
     pval = paramValues(i);
@@ -35,10 +38,33 @@ for i = 1:nParams
             cvmdl = crossval(mdl, 'KFold', a.K);
             preds = kfoldPredict(cvmdl);
             Yva = y;
+        case 'leaveout'
+            cvp = cvpartition(y, 'Leaveout');
+            preds = zeros(size(y));
+            for fold = 1:cvp.NumTestSets
+                tr = training(cvp, fold);
+                te = test(cvp, fold);
+                mdl = a.TrainFcn(X(tr,:), y(tr), pval);
+                preds(te) = a.PredictFcn(mdl, X(te,:));
+                if a.ShowProgress && (mod(fold, max(1,floor(cvp.NumTestSets/10))) == 0 || fold == cvp.NumTestSets)
+                    progress_bar(fold, cvp.NumTestSets, timerStart, sprintf('    leave-one-out %d', pval));
+                end
+            end
+            Yva = y;
+        otherwise
+            error('Unknown Split mode: %s', a.Split);
     end
 
     [acc, prec, rec, f1] = metrics_binary(preds, Yva);
     cvRes(i,:) = [pval, acc, prec, rec, f1];
+
+    if a.ShowProgress
+        progress_bar(i, nParams, timerStart, '  - CV progress');
+    end
+end
+
+if a.ShowProgress && nParams > 0
+    fprintf('  - CV grid done in %.1fs\n', toc(timerStart));
 end
 
 % Optional save

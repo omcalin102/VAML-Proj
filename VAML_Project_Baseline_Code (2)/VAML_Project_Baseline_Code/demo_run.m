@@ -1,6 +1,6 @@
 function demo_run()
 
-clc; close all; rng(42,'twister');                  % RNG seed (changeable)
+clc; close all; rng(42,'twister'); addpath(genpath('.')); % RNG seed (changeable)
 
 % ---- PATHS ----
 posDir   = fullfile('data','images','pos');         % training pos path
@@ -74,7 +74,7 @@ if exist(gtFile,'file') == 2 && exist('load_gt','file') == 2
 end
 
 allTP=0; allFP=0; allFN=0;
-tic;
+loopTimer = tic;
 for k = 1:numel(frames)
     I = imread(fullfile(frames(k).folder, frames(k).name));
 
@@ -102,8 +102,9 @@ for k = 1:numel(frames)
 
     writeVideo(vw, J);
     % imshow(J); drawnow;                          % enable live preview (optional)
+    progress_bar(k, numel(frames), loopTimer, '  - detecting');
 end
-t = toc; close(vw);
+t = toc(loopTimer); close(vw);
 fprintf('Saved: %s | %.2fs total (~%.2f fps)\n', vidPath, t, max(eps, numel(frames)/t));
 
 % ---- 5) METRICS ----

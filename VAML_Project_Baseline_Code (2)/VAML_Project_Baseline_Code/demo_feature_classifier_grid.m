@@ -1,7 +1,7 @@
 function demo_feature_classifier_grid()
 % Run feature x classifier grid with CV tables/plots for report justification.
 
-clc; close all; rng(42,'twister');
+clc; close all; rng(42,'twister'); addpath(genpath('.'));
 
 % ---- PATHS ----
 posDir   = fullfile('data','images','pos');
@@ -11,7 +11,7 @@ outFigureDir = fullfile('report','figs');
 ensure_dir(outTableDir, outFigureDir);
 
 % ---- CV SETTINGS ----
-splitMode = 'holdout';    % 'holdout' or 'kfold'
+splitMode = 'holdout';    % 'holdout', 'kfold', or 'leaveout'
 holdout   = 0.2;          % holdout fraction if splitMode='holdout'
 kfoldK    = 5;            % folds if splitMode='kfold'
 primary   = 'F1';         % primary metric for sorting/plots
@@ -45,6 +45,7 @@ classifiers = {
 % ---- BUILD DATASETS ----
 datasets = struct('Name',{},'X',{},'y',{});
 baseHog = [];
+buildTimer = tic;
 for i = 1:numel(featConfigs)
     cfg = featConfigs{i};
     fprintf('[1/%d] Building %s features ...\n', numel(featConfigs), cfg.Name);
@@ -71,10 +72,12 @@ for i = 1:numel(featConfigs)
     end
     datasets(end+1) = struct('Name',cfg.Name,'X',X,'y',y); %#ok<AGROW>
 end
+fprintf('Finished feature builds in %.1fs\n', toc(buildTimer));
 
 % ---- CROSS-VALIDATE ----
 rows = {};
 bestRows = {};
+cvTimer = tic;
 for d = 1:numel(datasets)
     ds = datasets(d);
     for c = 1:numel(classifiers)
@@ -86,14 +89,17 @@ for d = 1:numel(datasets)
                 cvArgs = [cvArgs, {'Split','holdout','Holdout', holdout}];
             case 'kfold'
                 cvArgs = [cvArgs, {'Split','kfold','K',kfoldK}];
+            case 'leaveout'
+                cvArgs = [cvArgs, {'Split','leaveout'}];
         end
-        cvRes = crossval_eval(ds.X, ds.y, clf.Params, cvArgs{:}, 'TrainFcn', clf.TrainFcn);
+        cvRes = crossval_eval(ds.X, ds.y, clf.Params, cvArgs{:}, 'TrainFcn', clf.TrainFcn, 'ShowProgress', true);
         for r = 1:size(cvRes,1)
             rows(end+1,:) = {ds.Name, clf.Name, cvRes(r,1), cvRes(r,2), cvRes(r,3), cvRes(r,4), cvRes(r,5)}; %#ok<AGROW>
         end
         bestRows(end+1,:) = {ds.Name, clf.Name, cvRes(1,1), cvRes(1,2), cvRes(1,3), cvRes(1,4), cvRes(1,5)}; %#ok<AGROW>
     end
 end
+fprintf('Finished CV grid in %.1fs\n', toc(cvTimer));
 
 T = cell2table(rows, 'VariableNames',{'Feature','Classifier','Param','Accuracy','Precision','Recall','F1'});
 Best = cell2table(bestRows, 'VariableNames',{'Feature','Classifier','Param','Accuracy','Precision','Recall','F1'});

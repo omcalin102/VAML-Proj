@@ -1,7 +1,7 @@
 function demo_detect()
 % Run detector with a saved model; saves video + optional detection metrics.
 
-clc; close all; rng(42,'twister');                           % RNG seed (changeable)
+clc; close all; rng(42,'twister'); addpath(genpath('.'));    % RNG seed (changeable)
 
 % ---- PATHS ----
 modelPath   = fullfile('results','models','model_baseline.mat'); % model path (changeable)
@@ -52,6 +52,7 @@ open(vw);
 % ---- RUN DETECTOR ----
 allTP=0; allFP=0; allFN=0;
 perFrameMs = zeros(numel(frames),1);
+loopTimer = tic;
 for k=1:numel(frames)
     I = imread(fullfile(frames(k).folder, frames(k).name));
     t0 = tic;
@@ -79,6 +80,7 @@ for k=1:numel(frames)
 
     writeVideo(vw,J);
     % imshow(J); drawnow;                                          % live preview (optional)
+    progress_bar(k, numel(frames), loopTimer, '  - detecting');
 end
 close(vw);
 
