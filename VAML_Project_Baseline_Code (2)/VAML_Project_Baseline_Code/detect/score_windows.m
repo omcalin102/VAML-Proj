@@ -36,18 +36,21 @@ boxes = zeros(a.MaxWindows, 4, 'single');
 scores = zeros(a.MaxWindows, 1, 'single');
 featDim = [];
 nKept = 0;
+maxPerScale = ceil(a.MaxWindows / numel(scales));   % spread windows across scales
 
 tFeat = tic;
 for sIdx = 1:numel(scales)
-    if nKept >= a.MaxWindows, break; end
+    remaining = a.MaxWindows - nKept;
+    if remaining <= 0, break; end
     scale = scales(sIdx);
     I_s = imresize(I, scale);
     wins = sliding_window(I_s, descCfg.ResizeTo, a.Step);
     if isempty(wins), continue; end
 
-    remaining = a.MaxWindows - nKept;
-    if size(wins,1) > remaining
-        wins = wins(round(linspace(1, size(wins,1), remaining)),:);
+    % Cap samples per scale to avoid exhausting the window budget on the first level
+    scaleBudget = min(remaining, maxPerScale);
+    if size(wins,1) > scaleBudget
+        wins = wins(round(linspace(1, size(wins,1), scaleBudget)),:);
     end
 
     for k = 1:size(wins,1)
