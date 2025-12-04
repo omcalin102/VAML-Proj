@@ -37,7 +37,9 @@ kfoldK      = 5;                                    % K for k-fold (changeable)
 Step        = 8;                                    % stride px (4/8/12) (changeable)
 ScaleFactor = 0.90;                                 % pyramid factor (0.85–0.95) (changeable)
 NMS_IoU     = 0.30;                                 % NMS IoU (0.3–0.5) (changeable)
-MinScore    = -Inf;                                 % pre-NMS score filter (changeable)
+MinScore    = 0;                                    % pre-NMS score filter (changeable)
+FPS         = 6;                                    % output video fps (changeable)
+VideoQuality= 100;                                  % video quality 0–100 (changeable)
 MaxFrames   = 10;                                   % frames to process (changeable)
 IoU_TP      = 0.50;                                 % TP IoU rule (changeable)
 
@@ -100,7 +102,10 @@ catch
     vidPath = fullfile(outVideoDir, 'demo_best_combo.avi');
     vw = VideoWriter(vidPath, 'Motion JPEG AVI');
 end
-vw.FrameRate = 6;  % changeable
+vw.FrameRate = FPS;  % changeable
+if isprop(vw,'Quality')
+    vw.Quality = VideoQuality;                      % clamp compression to max quality (changeable)
+end
 open(vw);
 
 haveGT = false; GT = [];
@@ -113,10 +118,12 @@ if exist(gtFile,'file') == 2 && exist('load_gt','file') == 2
 end
 
 allTP=0; allFP=0; allFN=0;
+perFrameMs = zeros(numel(frames),1);
 tic;
 for k = 1:numel(frames)
     I = imread(fullfile(frames(k).folder, frames(k).name));
 
+    t0 = tic;
     [boxes, scores] = score_windows(I, model, ...
         'BaseWindow',best.Descriptor.ResizeTo, ...   % window (changeable)
         'Step',Step, ...                             % stride (changeable)
@@ -124,6 +131,10 @@ for k = 1:numel(frames)
         'MinScore',MinScore);                        % pre-filter (changeable)
 
     [keepB, keepS] = nms(boxes, scores, NMS_IoU);    % NMS IoU (changeable)
+    perFrameMs(k) = toc(t0) * 1000;
+
+    posMask = keepS > MinScore;                      % keep only positive detections
+    keepB = keepB(posMask,:);
 
     J = insertShape(I, 'Rectangle', keepB, 'LineWidth', 2, 'Color', 'red');  % draw color (changeable)
 
@@ -144,6 +155,7 @@ for k = 1:numel(frames)
 end
 t = toc; close(vw);
 fprintf('Saved: %s | %.2fs total (~%.2f fps)\n', vidPath, t, max(eps, numel(frames)/t));
+fprintf('Mean frame time: %.1f ms/frame | output fps=%g quality=%g\n', mean(perFrameMs), vw.FrameRate, getfield_safe(vw,'Quality'));
 
 % ---- 4) METRICS ----
 if haveGT
@@ -170,6 +182,13 @@ for i=1:nargin, d = varargin{i}; if ~exist(d,'dir'), mkdir(d); end, end
 end
 function s = strip_extension(fname)
 [~,s,~] = fileparts(fname);
+end
+function v = getfield_safe(S, field)
+if isprop(S, field)
+    v = S.(field);
+else
+    v = NaN;
+end
 end
 
 end
