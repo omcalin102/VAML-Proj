@@ -18,13 +18,22 @@ end
 p = inputParser;
 addParameter(p, 'Distance', 'euclidean');
 addParameter(p, 'Standardize', true);
+% MATLAB's fitcknn only accepts 'kdtree' or 'exhaustive' for NSMethod in
+% some versions. Default to 'auto' for forward compatibility, but map it to
+% a supported option before calling fitcknn so older releases continue to
+% work.
 addParameter(p, 'NSMethod', 'auto');
 parse(p, varargin{:});
 a = p.Results;
+
+nsMethod = a.NSMethod;
+if strcmpi(nsMethod, 'auto')
+    nsMethod = 'exhaustive';
+end
 
 mdl = fitcknn(X, y, ...
     'NumNeighbors', k, ...
     'Distance', a.Distance, ...
     'Standardize', a.Standardize, ...
-    'NSMethod', a.NSMethod);
+    'NSMethod', nsMethod);
 end

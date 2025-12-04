@@ -43,6 +43,13 @@ fprintf('Saved model to results/models/model_baseline.mat\nDONE.\n');
 
 % ---- helper ----
 function ensure_dir(varargin)
-for i=1:nargin, d=varargin{i}; if ~exist(d,'dir'), mkdir(d); end, end
+for i = 1:nargin
+    d = varargin{i};
+    if exist(d,'dir'), continue; end
+    [status,msg] = mkdir(d); % mkdir creates intermediate folders when needed
+    if ~status
+        error('Failed to create directory %s: %s', d, msg);
+    end
+end
 end
 end
