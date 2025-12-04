@@ -36,9 +36,14 @@ addParameter(p, 'Verbose', true);
 parse(p, varargin{:});
 a = p.Results;
 
+% Resolve directories to absolute paths to avoid label misassignment when
+% callers pass relative folders and list_images returns absolute paths.
+posDirAbs = abs_path(posDir);
+negDirAbs = abs_path(negDir);
+
 % Collect image paths
-posFiles = list_images(posDir);
-negFiles = list_images(negDir);
+posFiles = list_images(posDirAbs);
+negFiles = list_images(negDirAbs);
 
 if a.Verbose
     fprintf('  - positives: %d | negatives: %d\n', numel(posFiles), numel(negFiles));
@@ -59,7 +64,7 @@ N = numel(allFiles);
 X = zeros(N, D, 'single');
 y = zeros(N, 1);
 X(1,:) = firstFeat;
-y(1) = label_from_path(allFiles{1}, posDir);
+y(1) = label_from_path(allFiles{1}, posDirAbs);
 
 % Process remaining files
 timerStart = tic;
@@ -68,7 +73,7 @@ for k = 2:N
         'FeatureType',a.FeatureType, 'ResizeTo',a.ResizeTo, 'CellSize',a.CellSize, ...
         'BlockSize',a.BlockSize, 'BlockOverlap',a.BlockOverlap, 'NumBins',a.NumBins, ...
         'EdgeMethod',a.EdgeMethod, 'PCA',a.PCA, 'PCADim',a.PCADim);
-    y(k) = label_from_path(allFiles{k}, posDir);
+    y(k) = label_from_path(allFiles{k}, posDirAbs);
 
     if a.Verbose && (mod(k, 100) == 0 || k == N)
         progress_bar(k, N, timerStart, '  - extracting features');
@@ -97,9 +102,34 @@ files = files(:);
 end
 
 function lbl = label_from_path(fpath, posDir)
-if startsWith(string(fpath), string(posDir))
-    lbl = 1;
+fpathAbs = abs_path(fpath);
+posRoot  = ensure_trailing_filesep(abs_path(posDir));
+lbl = startsWith(fpathAbs, posRoot);
+end
+
+function d = abs_path(p)
+if isempty(p), d = ''; return; end
+p = char(p);
+if is_absolute(p)
+    d = p;
 else
-    lbl = 0;
+    d = fullfile(pwd, p);
+end
+end
+
+function tf = is_absolute(p)
+if isempty(p)
+    tf = false; return;
+end
+if ispc
+    tf = startsWith(p, '\\') || (~isempty(p) && numel(p) >= 3 && p(2) == ':' && (p(3)=='\' || p(3)=='/'));
+else
+    tf = startsWith(p, filesep);
+end
+end
+
+function d = ensure_trailing_filesep(d)
+if ~isempty(d) && d(end) ~= filesep
+    d = [d filesep];
 end
 end
