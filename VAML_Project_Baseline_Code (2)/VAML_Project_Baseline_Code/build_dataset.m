@@ -8,7 +8,7 @@ function [X, y, descCfg] = build_dataset(posDir, negDir, varargin)
 %   so the detector can reuse the exact feature pipeline at test time.
 %
 %   Descriptor options (name/value pairs):
-%       'FeatureType'   'hog'     - 'hog' or 'pixels'
+%       'FeatureType'   'hog'     - 'hog', 'hogparts' or 'pixels'
 %       'ResizeTo'      [64 128]  - width/height to resize each crop
 %       'CellSize'      [8 8]     - HOG only
 %       'BlockSize'     [2 2]     - HOG only
@@ -44,6 +44,9 @@ descCfg = struct( ...
     'BlockOverlap', a.BlockOverlap, ...
     'NumBins', a.NumBins, ...
     'PCA', []);  % filled later if PCA requested
+
+validTypes = ["hog","pixels","hogparts"];
+assert(any(descCfg.Type == validTypes), 'Unsupported FeatureType: %s', descCfg.Type);
 
 % Collect image paths
 posFiles = list_images(posDir);
