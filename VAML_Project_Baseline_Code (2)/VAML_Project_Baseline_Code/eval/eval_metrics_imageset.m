@@ -16,7 +16,7 @@ addParameter(p,'BaseWindow',[64 128]);
 addParameter(p,'Step',16);
 addParameter(p,'ResizeLongSide',480);
 addParameter(p,'MinScore',0.6);
-addParameter(p,'NMS_IoU',0.35);
+addParameter(p,'NMS_IoU',0.25);
 addParameter(p,'GTFile','');
 addParameter(p,'IoU_TP',0.50);
 addParameter(p,'RunTag','run5');

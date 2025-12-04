@@ -12,7 +12,7 @@ addParameter(p,'OutTablesDir',fullfile('results','tables'));                    
 addParameter(p,'BaseWindow',[64 128]);        % changeable
 addParameter(p,'Step',8);                     % changeable
 addParameter(p,'ScaleFactor',0.90);           % changeable
-addParameter(p,'NMS_IoU',0.30);               % changeable
+addParameter(p,'NMS_IoU',0.25);               % changeable
 addParameter(p,'IoU_TP',0.50);                % changeable
 addParameter(p,'MinScore',-Inf);              % changeable
 addParameter(p,'MaxFrames',Inf);              % changeable

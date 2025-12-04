@@ -36,7 +36,7 @@ splitMode   = 'holdout';                            % 'holdout' or 'kfold'
 kfoldK      = 5;                                    % K for k-fold (changeable)
 Step        = 8;                                    % stride px (4/8/12) (changeable)
 ScaleFactor = 0.90;                                 % pyramid factor (0.85–0.95) (changeable)
-NMS_IoU     = 0.30;                                 % NMS IoU (0.3–0.5) (changeable)
+NMS_IoU     = 0.25;                                 % NMS IoU (lower = fewer overlaps) (changeable)
 MinScore    = -Inf;                                 % pre-NMS score filter (changeable)
 MaxFrames   = 10;                                   % frames to process (changeable)
 IoU_TP      = 0.50;                                 % TP IoU rule (changeable)

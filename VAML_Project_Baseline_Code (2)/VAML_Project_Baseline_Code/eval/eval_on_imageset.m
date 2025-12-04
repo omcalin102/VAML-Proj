@@ -10,7 +10,7 @@ addParameter(p,'BaseWindow',[64 128]);                                          
 addParameter(p,'Step',16);                                                      % stride pixels
 addParameter(p,'ResizeLongSide',480);                                           % downsize long side (speed)
 addParameter(p,'MinScore',0.6);                                                 % margin threshold (stricter)
-addParameter(p,'NMS_IoU',0.35);                                                 % NMS IoU (lower = fewer merges)
+addParameter(p,'NMS_IoU',0.25);                                                 % NMS IoU (lower = fewer merges)
 addParameter(p,'OutDir',fullfile('results','frames_sample'));                   % base output dir
 addParameter(p,'RunTag','run2');                                                % subfolder (avoid overwrite)
 addParameter(p,'KeepTopK',5);                                                   % keep top-K detections per image

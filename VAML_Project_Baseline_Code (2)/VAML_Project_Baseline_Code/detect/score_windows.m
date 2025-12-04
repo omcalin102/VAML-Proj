@@ -9,6 +9,7 @@ addParameter(p,'MinScore',-Inf);         % keep boxes with score >= MinScore
 addParameter(p,'MaxWindows',400);        % hard cap for speed
 addParameter(p,'Verbose',true);          % print progress
 addParameter(p,'Descriptor',[]);         % optional override descCfg
+addParameter(p,'BoxShrink',0.90);        % <1 shrinks boxes to better fit subject
 parse(p,varargin{:}); a = p.Results;
 
 % Determine descriptor (fall back to HOG defaults)
@@ -94,6 +95,19 @@ keep  = sc >= a.MinScore;                 % ← raise to be stricter
 boxes = boxes(keep,:);
 scores= sc(keep);
 if a.Verbose, fprintf('  - prefilter kept: %d\n', numel(scores)); drawnow; end
+
+% 5) Tighten boxes to reduce overlap + padding around pedestrians
+if ~isempty(boxes) && a.BoxShrink~=1
+    imgW = size(I,2); imgH = size(I,1);
+    ctrs = boxes(:,1:2) + boxes(:,3:4)/2;
+    newWH = max(boxes(:,3:4) .* a.BoxShrink, 1);  % keep at least 1px
+    boxes(:,1:2) = ctrs - newWH/2;
+    boxes(:,3:4) = newWH;
+
+    % clamp to image bounds after shrink so NMS sees valid regions
+    boxes(:,1) = max(1, min(boxes(:,1), imgW - boxes(:,3) + 1));
+    boxes(:,2) = max(1, min(boxes(:,2), imgH - boxes(:,4) + 1));
+end
 end
 
 % ------- helpers -------
