@@ -3,11 +3,15 @@ function demo_feature_classifier_grid()
 
 clc; close all; rng(42,'twister'); addpath(genpath('.'));
 
+% Resolve all paths relative to this file so runs from other working
+% directories still find the data and output locations.
+rootDir = fileparts(mfilename('fullpath'));
+
 % ---- PATHS ----
-posDir   = fullfile('data','images','pos');
-negDir   = fullfile('data','images','neg');
-outTableDir  = fullfile('results','tables');
-outFigureDir = fullfile('report','figs');
+posDir   = fullfile(rootDir,'data','images','pos');
+negDir   = fullfile(rootDir,'data','images','neg');
+outTableDir  = fullfile(rootDir,'results','tables');
+outFigureDir = fullfile(rootDir,'report','figs');
 ensure_dir(outTableDir, outFigureDir);
 
 % ---- CV SETTINGS ----

@@ -9,39 +9,34 @@ if isempty(boxes)
 end
 
 % sort by score
-[sortedS, order] = sort(scores(:), 'descend');
-B = boxes(order, :);
-
-x1 = B(:,1); y1 = B(:,2);
-x2 = B(:,1)+B(:,3)-1; y2 = B(:,2)+B(:,4)-1;
+[~, order] = sort(scores(:), 'descend');
+x1 = boxes(:,1); y1 = boxes(:,2);
+x2 = boxes(:,1)+boxes(:,3)-1; y2 = boxes(:,2)+boxes(:,4)-1;
 areas = (x2 - x1 + 1) .* (y2 - y1 + 1);
 
-keep = false(size(B,1),1);
-while ~isempty(B)
-    keep(1) = true;
-    if size(B,1) == 1, break; end
+keepIdx = zeros(numel(order),1); k = 0;
+while ~isempty(order)
+    k = k + 1;
+    i = order(1);               % index of highest remaining score
+    keepIdx(k) = i;
+    if numel(order) == 1, break; end
 
-    xx1 = max(B(1,1), B(2:end,1));
-    yy1 = max(B(1,2), B(2:end,2));
-    xx2 = min(B(1,1)+B(1,3)-1, B(2:end,1)+B(2:end,3)-1);
-    yy2 = min(B(1,2)+B(1,4)-1, B(2:end,2)+B(2:end,4)-1);
+    % IoU of the top box vs. the rest
+    xx1 = max(x1(i), x1(order(2:end)));
+    yy1 = max(y1(i), y1(order(2:end)));
+    xx2 = min(x2(i), x2(order(2:end)));
+    yy2 = min(y2(i), y2(order(2:end)));
 
     w = max(0, xx2 - xx1 + 1);
     h = max(0, yy2 - yy1 + 1);
     inter = w .* h;
+    iou = inter ./ (areas(i) + areas(order(2:end)) - inter);
 
-    area1 = areas(1);
-    area2 = areas(2:end);
-    iou = inter ./ (area1 + area2 - inter);
-
-    keepIdxLocal = find([true; iou <= iouThr]);     % IoU threshold (changeable)
-    B     = B(keepIdxLocal, :);
-    areas = areas(keepIdxLocal);
-    sortedS = sortedS(keepIdxLocal);
-    keep = keep(keepIdxLocal);
+    % strictly drop only when IoU exceeds the threshold so the loop shrinks
+    order = order([true; iou <= iouThr]);  % keep first + low IoU
 end
 
-keepIdx = order(keep);
+keepIdx = keepIdx(1:k);
 keepB   = boxes(keepIdx, :);
 keepS   = scores(keepIdx);
 end
