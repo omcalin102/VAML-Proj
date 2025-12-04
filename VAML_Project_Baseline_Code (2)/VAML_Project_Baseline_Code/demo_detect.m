@@ -13,14 +13,15 @@ outFigureDir= fullfile('report','figs');                          % figs out (ch
 ensure_dir(outVideoDir, outTableDir, outFigureDir);
 
 % ---- DETECTOR HYPER-PARAMETERS ----
-BaseWindow  = [64 128];        % window size [w h] (changeable, overridden by model descriptor)
-Step        = 8;               % stride px (4/8/12) (changeable)
-ScaleFactor = 0.90;            % pyramid factor (0.85–0.95) (changeable)
-NMS_IoU     = 0.30;            % NMS IoU (0.3–0.5) (changeable)
-MinScore    = 0;               % pre-NMS score filter (changeable)
-MaxFrames   = 12;              % frames to process (changeable)
-IoU_TP      = 0.50;            % TP IoU rule (changeable)
-FPS         = 6;               % output video fps (changeable)
+BaseWindow   = [64 128];        % window size [w h] (changeable, overridden by model descriptor)
+Step         = 8;               % stride px (4/8/12) (changeable)
+ScaleFactor  = 0.90;            % pyramid factor (0.85–0.95) (changeable)
+NMS_IoU      = 0.30;            % NMS IoU (0.3–0.5) (changeable)
+MinScore     = 0;               % pre-NMS score filter (changeable)
+MaxFrames    = 12;              % frames to process (changeable)
+IoU_TP       = 0.50;            % TP IoU rule (changeable)
+FPS          = 6;               % output video fps (changeable)
+VideoQuality = 100;             % video quality 0–100 (changeable)
 
 % ---- LOAD MODEL ----
 assert(exist(modelPath,'file')==2, 'Model not found: %s', modelPath);
@@ -49,7 +50,10 @@ catch
     vidPath = fullfile(outVideoDir, 'demo_baseline.avi'); % fallback filename
     vw = VideoWriter(vidPath, 'Motion JPEG AVI');         % AVI fallback
 end
-vw.FrameRate = 6;  % changeable
+vw.FrameRate = FPS;                                     % changeable
+if isprop(vw,'Quality')
+    vw.Quality = VideoQuality;                          % clamp compression to max quality
+end
 open(vw);
 
 % ---- RUN DETECTOR ----
