@@ -2,15 +2,17 @@ function demo_detection_sweep()
 % Evaluate multiple detector hyper-parameter versions with metrics + timings.
 % Produces CSV/figure artifacts to justify operating-point choices.
 
-clc; close all; rng(42,'twister'); addpath(genpath('.'));
+clc; close all; rng(42,'twister');
+scriptDir = fileparts(mfilename('fullpath'));
+addpath(genpath(scriptDir));
 
 % ---- PATHS ----
-frameDir    = fullfile('pedestrian','pedestrian');
-gtFile      = fullfile('data','test.dataset');
-modelPath   = fullfile('results','models','model_baseline.mat');
-outTableDir = fullfile('results','tables');
-outFigureDir= fullfile('report','figs');
-ensure_dir(outTableDir, outFigureDir);
+frameDir    = fullfile(scriptDir,'pedestrian','pedestrian');
+gtFile      = fullfile(scriptDir,'data','test.dataset');
+modelPath   = fullfile(scriptDir,'results','models','model_baseline.mat');
+outTableDir = fullfile(scriptDir,'results','tables');
+outFigureDir= fullfile(scriptDir,'report','figs');
+ensure_dir(fileparts(modelPath), outTableDir, outFigureDir);
 
 % ---- DETECTOR VERSIONS (3–6 configs) ----
 configs = {
@@ -22,8 +24,7 @@ configs = {
 };
 
 % ---- LOAD MODEL / GT ----
-assert(exist(modelPath,'file')==2, 'Model not found: %s', modelPath);
-S = load(modelPath); model = S.model;
+model = load_or_train_model(modelPath, scriptDir);
 assert(exist(gtFile,'file')==2 && exist('load_gt','file')==2, 'Ground truth utilities missing.');
 GT = load_gt(gtFile);
 frames = dir(fullfile(frameDir,'*.jpg')); if isempty(frames), frames = dir(fullfile(frameDir,'*.png')); end
@@ -75,6 +76,21 @@ exportgraphics(fig, figPath, 'Resolution', 150); close(fig);
 fprintf('Saved figure: %s\n', figPath);
 
 fprintf('DONE.\n');
+end
+
+function model = load_or_train_model(modelPath, scriptDir)
+if exist(modelPath,'file')==2
+    S = load(modelPath); model = S.model; return;
+end
+
+fprintf('Model not found at %s. Training a baseline detector...\n', modelPath);
+posDir = fullfile(scriptDir,'data','images','pos');
+negDir = fullfile(scriptDir,'data','images','neg');
+[X,y] = build_dataset(posDir, negDir);
+model = train_svm(X, y, 1.0);
+ensure_dir(fileparts(modelPath));
+save(modelPath, 'model');
+fprintf('Saved fallback model to %s\n', modelPath);
 end
 
 function ensure_dir(varargin)
