@@ -11,7 +11,7 @@ addParameter(p,'BaseWindow',[64 128]);
 addParameter(p,'Step',16);
 addParameter(p,'ResizeLongSide',480);
 addParameter(p,'MinScore',0.6);
-addParameter(p,'NMS_IoU',0.35);
+addParameter(p,'NMS_IoU',0.25);
 parse(p,varargin{:}); a = p.Results;
 
 assert(~isempty(a.ImageDir) && exist(a.ImageDir,'dir')==7, 'Bad ImageDir: %s', a.ImageDir);

@@ -16,7 +16,7 @@ ensure_dir(outVideoDir, outTableDir, outFigureDir);
 BaseWindow   = [64 128];        % window size [w h] (changeable, overridden by model descriptor)
 Step         = 8;               % stride px (4/8/12) (changeable)
 ScaleFactor  = 0.90;            % pyramid factor (0.85–0.95) (changeable)
-NMS_IoU      = 0.30;            % NMS IoU (0.3–0.5) (changeable)
+NMS_IoU      = 0.25;            % NMS IoU (lower = fewer overlaps) (changeable)
 MinScore     = 0;               % pre-NMS score filter (changeable)
 MaxFrames    = 12;              % frames to process (changeable)
 IoU_TP       = 0.50;            % TP IoU rule (changeable)

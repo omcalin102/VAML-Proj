@@ -1,7 +1,7 @@
 function [keepB, keepS, keepIdx] = nms(boxes, scores, iouThr, varargin)
 % Greedy Non-Max Suppression on [x y w h] boxes by descending score.
 
-if nargin<3 || isempty(iouThr), iouThr = 0.3; end  % IoU threshold (changeable)
+if nargin<3 || isempty(iouThr), iouThr = 0.25; end  % IoU threshold (changeable)
 
 if isempty(boxes)
     keepB = zeros(0,4); keepS = zeros(0,1); keepIdx = [];

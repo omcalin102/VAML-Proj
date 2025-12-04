@@ -12,7 +12,7 @@ addParameter(p,'BaseWindow',[64 128]);                           % [w h]
 addParameter(p,'Step',16);                                       % stride
 addParameter(p,'ResizeLongSide',480);                            % work size
 addParameter(p,'MinScore',0.6);                                  % threshold
-addParameter(p,'NMS_IoU',0.35);                                  % NMS
+addParameter(p,'NMS_IoU',0.25);                                  % NMS
 addParameter(p,'RunTag','run3');                                 % subfolder
 parse(p,varargin{:}); a = p.Results;
 

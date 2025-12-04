@@ -9,6 +9,7 @@ addParameter(p,'MinScore',-Inf);         % keep boxes with score >= MinScore
 addParameter(p,'MaxWindows',400);        % hard cap for speed
 addParameter(p,'Verbose',true);          % print progress
 addParameter(p,'Descriptor',[]);         % optional override descCfg
+addParameter(p,'BoxShrink',0.90);        % <1 shrinks boxes to better fit subject
 parse(p,varargin{:}); a = p.Results;
 
 % Determine descriptor (fall back to HOG defaults)
@@ -94,26 +95,17 @@ keep  = sc >= a.MinScore;                 % ← raise to be stricter
 boxes = boxes(keep,:);
 scores= sc(keep);
 if a.Verbose, fprintf('  - prefilter kept: %d\n', numel(scores)); drawnow; end
-end
 
-% ------- helpers -------
-function wins = sliding_window(I, wh, step)
-W = size(I,2); H = size(I,1); w = wh(1); h = wh(2);
-xs = 1:step:max(1, W-w+1); ys = 1:step:max(1, H-h+1);
-[XX,YY] = meshgrid(xs,ys);
-wins = [XX(:) YY(:) repmat([w h], numel(XX), 1)];
-end
+% 5) Tighten boxes to reduce overlap + padding around pedestrians
+if ~isempty(boxes) && a.BoxShrink~=1
+    imgW = size(I,2); imgH = size(I,1);
+    ctrs = boxes(:,1:2) + boxes(:,3:4)/2;
+    newWH = max(boxes(:,3:4) .* a.BoxShrink, 1);  % keep at least 1px
+    boxes(:,1:2) = ctrs - newWH/2;
+    boxes(:,3:4) = newWH;
 
-function P = imcrop_safe(I, box)
-x = max(1, box(1)); y = max(1, box(2)); w = max(1, box(3)); h = max(1, box(4));
-x2 = min(size(I,2), x+w-1); y2 = min(size(I,1), y+h-1);
-P = I(y:y2, x:x2);
-end
-
-function clf = get_classifier(model)
-if isstruct(model) && isfield(model,'Classifier')
-    clf = model.Classifier;
-else
-    clf = model;
+    % clamp to image bounds after shrink so NMS sees valid regions
+    boxes(:,1) = max(1, min(boxes(:,1), imgW - boxes(:,3) + 1));
+    boxes(:,2) = max(1, min(boxes(:,2), imgH - boxes(:,4) + 1));
 end
 end
