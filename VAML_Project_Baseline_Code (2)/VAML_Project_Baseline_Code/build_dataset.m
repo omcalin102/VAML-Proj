@@ -45,6 +45,11 @@ negDirAbs = abs_path(negDir);
 posFiles = list_images(posDirAbs);
 negFiles = list_images(negDirAbs);
 
+% Precompute labels based on directory of origin (more reliable than string
+% matching against absolute paths which can differ if symlinks/relative
+% paths are used by the caller)
+labels = [ones(numel(posFiles),1); zeros(numel(negFiles),1)];
+
 if a.Verbose
     fprintf('  - positives: %d | negatives: %d\n', numel(posFiles), numel(negFiles));
 end
@@ -64,7 +69,7 @@ N = numel(allFiles);
 X = zeros(N, D, 'single');
 y = zeros(N, 1);
 X(1,:) = firstFeat;
-y(1) = label_from_path(allFiles{1}, posDirAbs);
+y(1) = labels(1);
 
 % Process remaining files
 timerStart = tic;
@@ -73,7 +78,7 @@ for k = 2:N
         'FeatureType',a.FeatureType, 'ResizeTo',a.ResizeTo, 'CellSize',a.CellSize, ...
         'BlockSize',a.BlockSize, 'BlockOverlap',a.BlockOverlap, 'NumBins',a.NumBins, ...
         'EdgeMethod',a.EdgeMethod, 'PCA',a.PCA, 'PCADim',a.PCADim);
-    y(k) = label_from_path(allFiles{k}, posDirAbs);
+    y(k) = labels(k);
 
     if a.Verbose && (mod(k, 100) == 0 || k == N)
         progress_bar(k, N, timerStart, '  - extracting features');
