@@ -18,26 +18,25 @@ primary   = 'F1';                                       % selection/display metr
 
 % ---- 1) DATASET ----
 fprintf('[1/3] Building dataset ...\n');
-[X,y] = build_dataset(posDir, negDir);                  % uses extract_hog settings
+[X,y] = build_dataset(posDir, negDir, 'FeatureType','hog');
 
 % ---- 2) CV ----
 fprintf('[2/3] Cross-validating ...\n');
 if strcmpi(splitMode,'kfold')
     cvRes = crossval_eval(X, y, C_values, 'Split','kfold','K',kfoldK, ...
-                          'OutDir',outTableDir,'PrimaryMetric',primary);
+                          'OutDir',outTableDir,'PrimaryMetric',primary, 'ModelType','svm','ParamName','C');
 else
     cvRes = crossval_eval(X, y, C_values, 'Split','holdout','Holdout',0.2, ...
-                          'OutDir',outTableDir,'PrimaryMetric',primary);  % holdout size (changeable)
+                          'OutDir',outTableDir,'PrimaryMetric',primary, 'ModelType','svm','ParamName','C');  % holdout size (changeable)
 end
 
 % ---- 3) FIGURE (bar) ----
 fprintf('[3/3] Plotting ...\n');
-T = array2table(cvRes, 'VariableNames', {'C','Accuracy','Precision','Recall','F1'});
 fig = figure('Color','w','Position',[100 100 900 420]);  % figure size (changeable)
 metrics = {'Accuracy','Precision','Recall','F1'};
-vals = table2array(T(:, metrics));
+vals = table2array(cvRes(:, metrics));
 bar(vals); grid on; box on;
-xticklabels(compose('C=%.2g', T.C));
+xticklabels(compose('C=%.2g', cvRes.C));
 legend(metrics, 'Location','southoutside','Orientation','horizontal');
 title(sprintf('Cross-Validation (%s primary)', primary));
 ylabel('Score'); ylim([0 1]);                           % ylim (changeable)
